@@ -1,4 +1,4 @@
-package it.polimi.middleware.kafka.admin;
+package it.polimi.nsds.kafka.admin;
 
 import org.apache.kafka.clients.admin.*;
 
@@ -6,9 +6,9 @@ import java.util.Collections;
 import java.util.Properties;
 import java.util.Set;
 
-public class TopicManager  {
-    private static final String defaultTopicName = "topicA";
-    private static final int defaultTopicPartitions = 2;
+public class TopicManager {
+    private static final String defaultTopicName = "inputTopic";
+    private static final int defaultTopicPartitions = 4;
     private static final short defaultReplicationFactor = 1;
 
     private static final String serverAddr = "localhost:9092";

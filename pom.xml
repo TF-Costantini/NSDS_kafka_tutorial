@@ -3,16 +3,15 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>it.polimi.nsds.kafka</groupId>
-    <artifactId>tutorial</artifactId>
+    <artifactId>lab</artifactId>
     <version>1</version>
 
-    <name>Kafka Tutorial</name>
+    <name>Kafka Eval 2024</name>
 
     <properties>
+        <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
     </properties>
 
     <dependencies>
