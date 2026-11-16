@@ -4,6 +4,7 @@ import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.IntegerDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -97,7 +98,7 @@ public class ConsumersXX {
             consumerProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, String.valueOf(true));
             consumerProps.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, 1000);
             // Deliberate choice, if I register to an old topic I want to consume only the latest stuff not weeks old messages for this problem domain.
-            // consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+            consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
 
             KafkaConsumer<String, Integer> consumer = new KafkaConsumer<>(consumerProps);
             consumer.subscribe(Arrays.asList(temperaturesTopic, humiditiesTopic));
@@ -126,19 +127,20 @@ public class ConsumersXX {
                     temps.putIfAbsent(key, new Window());
                     tempWindow = temps.get(key);
 
-                    if (topic == humiditiesTopic) {
+                    if (topic.equals(humiditiesTopic)) {
                         humWindow.addValue(value);
-                    } else if (topic == temperaturesTopic) {
+                    } else if (topic.equals(temperaturesTopic)) {
                         tempWindow.addValue(value);
-
                     }
 
-                    int humSum = humWindow.windowSum();
+                    if (!humWindow.isFull() || !tempWindow.isFull()) continue;
+
+                    double humSum = humWindow.windowSum();
                     System.out.println("Key: " + key + "\thumidity Total: " +  humSum);
-                    int tempSum = tempWindow.windowSum();
+                    double tempSum = tempWindow.windowSum();
                     System.out.println("Key: " + key + "\ttemp Total: " + tempSum);
 
-                    if (humSum > humidityThreshold &&  tempSum < temperatureThreshold) {
+                    if (tempSum > temperatureThreshold && humSum < humidityThreshold) {
                         System.out.println("OVER THRESHOLD -> humidity: " +  humSum + "\ttemp: " + tempSum);
                         producer.send(new ProducerRecord<>(outputTopic, key, "OVER THRESHOLD"));
                     }
@@ -152,11 +154,13 @@ public class ConsumersXX {
         private final String consumerGroupId;
 
         private static final String inputTopic = "alerts";
+        private static final String reactionsTopic = "reactions";
         private static final String outputTopic = "processedAlerts";
 
-        // TODO: add attributes if needed
+        private static final String reaction1 = "reaction1";
+        private static final String reaction2 = "reaction2";
 
-        // TODO: add arguments if necessary
+
         public Reactor(String serverAddr, String consumerGroupId) {
             this.serverAddr = serverAddr;
             this.consumerGroupId = consumerGroupId;
@@ -170,10 +174,25 @@ public class ConsumersXX {
 
             consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
             consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-
-            // TODO: add properties if needed
+            consumerProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, String.valueOf(false));
+            // Deliberate choice, if I register to an old topic I want to consume only the latest stuff not weeks old messages for this problem domain.
+            consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
 
             KafkaConsumer<String, String> consumer = new KafkaConsumer<>(consumerProps);
+            consumer.subscribe(Arrays.asList(inputTopic));
+
+            final Properties consumerProps2 = new Properties();
+            consumerProps2.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, serverAddr);
+            consumerProps2.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId);
+
+            consumerProps2.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+            consumerProps2.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, );
+            consumerProps2.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, String.valueOf(false));
+            // Deliberate choice, if I register to an old topic I want to consume only the latest stuff not weeks old messages for this problem domain.
+            consumerProps2.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+
+            KafkaConsumer<String, Reaction> consumer2 = new KafkaConsumer<>(consumerProps2);
+            consumer2.subscribe(Arrays.asList(reactionsTopic));
 
             // Producer
             final Properties producerProps = new Properties();
@@ -181,16 +200,49 @@ public class ConsumersXX {
             producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
             producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
 
-            // TODO: add properties if needed
-
             final KafkaProducer<String, String> producer = new KafkaProducer<>(producerProps);
 
-            // TODO: implement the processing logic
+            // Producer2
+            final Properties producerProps2 = new Properties();
+            producerProps2.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, serverAddr);
+            producerProps2.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+            producerProps2.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+
+            final KafkaProducer<String, Reaction> producer2 = new KafkaProducer<>(producerProps2);
+
             while (true) {
-                // TODO: implement the processing logic
+                final ConsumerRecords<String, String> inputRecords = consumer.poll(Duration.of(5, ChronoUnit.MINUTES));
+                final ConsumerRecords<String, Reaction> reactionRecords = consumer2.poll(Duration.of(5, ChronoUnit.MINUTES));
+
+                for (final ConsumerRecord<String, String> thisRecord: inputRecords) {
+                    String key = thisRecord.key();
+                    String value = thisRecord.value();
+
+                    producer2.send(new ProducerRecord<>(reactionsTopic, key, new Reaction(reaction1, value)));
+                }
+
+
+
+                for (final ConsumerRecord<String, Reaction> reactRecord: reactionRecords) {
+                    String key = reactRecord.key();
+                    Reaction value = reactRecord.value();
+
+                    if (value.reaction.equals(reaction1)) {
+                        reaction1(key, value.msg);
+                        producer2.send(new ProducerRecord<>(reactionsTopic, key, new Reaction(reaction2, value.msg)));
+                    } else if (value.reaction.equals(reaction2)) {
+                        reaction2(key, value.msg);
+                        producer.send(new ProducerRecord<>(outputTopic, key, value.msg));
+                    }
+                }
+
             }
         }
+
+        private record Reaction(String reaction, String msg) {}
+
     }
+
 
     private static class Window {
         private Deque<Integer> window = new ArrayDeque<>();
@@ -205,15 +257,17 @@ public class ConsumersXX {
             window.addFirst(nullSafeValue);
         }
 
-        public int windowSum() {
-            if (window.size() < 3) return 0;
+        public boolean isFull() {
+            return window.size() == 3;
+        }
 
+        public double windowSum() {
             int sum = 0;
             for (Integer val: window) {
                 sum += val;
             }
 
-            return sum/window.size();
+            return (double) sum / window.size();
         }
     }
 }
