@@ -3,10 +3,10 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>it.polimi.nsds.kafka</groupId>
-    <artifactId>lab</artifactId>
+    <artifactId>kafka-eval-2026</artifactId>
     <version>1</version>
 
-    <name>Kafka Eval 2024</name>
+    <name>Kafka Eval 2026</name>
 
     <properties>
         <maven.compiler.release>17</maven.compiler.release>
@@ -18,7 +18,7 @@
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-clients</artifactId>
-            <version>4.1.0</version>
+            <version>4.4.0</version>
         </dependency>
     </dependencies>
 </project>
