@@ -3,10 +3,13 @@ package it.polimi.nsds.kafka.eval;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.IntegerDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 // Group number:
@@ -105,15 +108,38 @@ public class ConsumersXX {
             producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
             producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
 
-
-            final HashMap<String, Integer> humidities =
-
             final KafkaProducer<String, String> producer = new KafkaProducer<>(producerProps);
 
 
-            // TODO: implement the processing logic
+            final HashMap<String, Window> humidities = new HashMap<>();
+            final HashMap<String, Window> temps = new HashMap<>();
             while (true) {
-                // TODO: implement the processing logic
+                final ConsumerRecords<String, Integer> records = consumer.poll(Duration.of(5, ChronoUnit.MINUTES));
+                for (final ConsumerRecord<String, Integer> thisRecord: records) {
+                    String topic = thisRecord.topic();
+                    String key = thisRecord.key();
+                    Integer value = thisRecord.value();
+
+                    Window tempWindow, humWindow; //temp value always replaced
+                    humidities.putIfAbsent(key, new Window());
+                    humWindow = humidities.get(key);
+                    tempWindow = temps.get(key);
+                    tempWindow.addValue(value);
+
+                    if (topic == humiditiesTopic) {
+                        humWindow.addValue(value);
+                    } else if (topic == temperaturesTopic) {
+                        temps.putIfAbsent(key, new Window());
+                    }
+
+                    int humSum = humWindow.windowSum();
+                    int tempSum = tempWindow.windowSum();
+
+                    if (humSum > humidityThreshold &&  tempSum < temperatureThreshold) {
+                        System.out.println("OVER THRESHOLD -> humidity: " +  humSum + "\ttemp: " + tempSum);
+                        producer.send(new ProducerRecord<>(outputTopic, key, "OVER THRESHOLD"));
+                    }
+                }
             }
         }
     }
@@ -163,10 +189,12 @@ public class ConsumersXX {
         }
     }
 
-    private class Window {
+    private static class Window {
         private Deque<Integer> window = new ArrayDeque<>();
 
-        public void add(Integer newValue) {
+        public Window() {}
+
+        public void addValue(Integer newValue) {
             int nullSafeValue = 0;
             if (newValue != null) nullSafeValue = newValue;
 
@@ -175,6 +203,8 @@ public class ConsumersXX {
         }
 
         public int windowSum() {
+            if (window.size() < 3) return 0;
+
             int sum = 0;
             for (Integer val: window) {
                 sum += val;
