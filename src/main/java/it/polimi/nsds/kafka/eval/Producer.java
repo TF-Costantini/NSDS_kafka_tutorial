@@ -12,7 +12,7 @@ public class Producer {
     private static final String topic1 = "temperature";
     private static final String topic2 = "humidity";
 
-    private static final int waitBetweenMsgs = 500;
+    private static final int waitBetweenMsgs = 50;
 
     private static final String serverAddr = "localhost:9092";
 
@@ -27,7 +27,7 @@ public class Producer {
 
         while (true) {
             final String topic = r.nextBoolean() ? topic1 : topic2;
-            final String key = "Key" + r.nextInt(10);
+            final String key = "Key" + r.nextInt(2);
             final int value = r.nextInt(100);
             System.out.println(
                     "Topic: " + topic +

@@ -97,7 +97,7 @@ public class ConsumersXX {
             consumerProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, String.valueOf(true));
             consumerProps.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, 1000);
             // Deliberate choice, if I register to an old topic I want to consume only the latest stuff not weeks old messages for this problem domain.
-            consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+            // consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
 
             KafkaConsumer<String, Integer> consumer = new KafkaConsumer<>(consumerProps);
             consumer.subscribe(Arrays.asList(temperaturesTopic, humiditiesTopic));
@@ -123,17 +123,20 @@ public class ConsumersXX {
                     Window tempWindow, humWindow; //temp value always replaced
                     humidities.putIfAbsent(key, new Window());
                     humWindow = humidities.get(key);
+                    temps.putIfAbsent(key, new Window());
                     tempWindow = temps.get(key);
-                    tempWindow.addValue(value);
 
                     if (topic == humiditiesTopic) {
                         humWindow.addValue(value);
                     } else if (topic == temperaturesTopic) {
-                        temps.putIfAbsent(key, new Window());
+                        tempWindow.addValue(value);
+
                     }
 
                     int humSum = humWindow.windowSum();
+                    System.out.println("Key: " + key + "\thumidity Total: " +  humSum);
                     int tempSum = tempWindow.windowSum();
+                    System.out.println("Key: " + key + "\ttemp Total: " + tempSum);
 
                     if (humSum > humidityThreshold &&  tempSum < temperatureThreshold) {
                         System.out.println("OVER THRESHOLD -> humidity: " +  humSum + "\ttemp: " + tempSum);
@@ -198,8 +201,8 @@ public class ConsumersXX {
             int nullSafeValue = 0;
             if (newValue != null) nullSafeValue = newValue;
 
-            if (window.size() >= 3) window.removeLast();
-            window.addFirst(newValue);
+            if (window.size() == 3) window.removeLast();
+            window.addFirst(nullSafeValue);
         }
 
         public int windowSum() {
