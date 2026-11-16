@@ -218,8 +218,8 @@ public class ConsumersXX {
                     String key = thisRecord.key();
                     String value = thisRecord.value();
 
-                    send(producer2, new ProducerRecord<>(reactionsTopic, key, new Reaction(reaction1, value)));
-                    commit(consumer, thisRecord);
+                    producer2.send(new ProducerRecord<>(reactionsTopic, key, new Reaction(reaction1, value)));
+                    consumer.commitSync(Collections.singletonMap(new TopicPartition(thisRecord.topic(), thisRecord.partition()), new OffsetAndMetadata(thisRecord.offset() + 1)));
                 }
 
                 final ConsumerRecords<String, Reaction> reactionRecords = consumer2.poll(Duration.of(100, ChronoUnit.MILLIS));
@@ -229,29 +229,17 @@ public class ConsumersXX {
 
                     if (value.reaction.equals(reaction1)) {
                         reaction1(key, value.msg);
-                        send(producer2, new ProducerRecord<>(reactionsTopic, key, new Reaction(reaction2, value.msg)));
+                        producer2.send(new ProducerRecord<>(reactionsTopic, key, new Reaction(reaction2, value.msg)));
                     } else if (value.reaction.equals(reaction2)) {
                         reaction2(key, value.msg);
-                        send(producer, new ProducerRecord<>(outputTopic, key, value.msg));
+                        producer.send(new ProducerRecord<>(outputTopic, key, value.msg));
+                        System.out.println("FINAL MESSAGE room: " + key + " msg:" + value.msg);
                     }
-                    commit(consumer2, reactRecord);
+                    consumer2.commitSync(Collections.singletonMap(new TopicPartition(reactRecord.topic(), reactRecord.partition()), new OffsetAndMetadata(reactRecord.offset() + 1)));
                 }
             }
         }
 
-        private static <V> void send(KafkaProducer<String, V> producer, ProducerRecord<String, V> record) {
-            try {
-                producer.send(record).get();
-            } catch (InterruptedException | ExecutionException e) {
-                throw new RuntimeException(e);
-            }
-        }
-
-        private static void commit(KafkaConsumer<String, ?> consumer, ConsumerRecord<String, ?> record) {
-            consumer.commitSync(Collections.singletonMap(
-                    new TopicPartition(record.topic(), record.partition()),
-                    new OffsetAndMetadata(record.offset() + 1)));
-        }
     }
 
     private record Reaction(String reaction, String msg) {}

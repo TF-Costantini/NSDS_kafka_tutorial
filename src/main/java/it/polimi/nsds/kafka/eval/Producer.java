@@ -27,7 +27,7 @@ public class Producer {
 
         while (true) {
             final String topic = r.nextBoolean() ? topic1 : topic2;
-            final String key = "Key" + r.nextInt(2);
+            final String key = "Key" + r.nextInt(10);
             final int value = r.nextInt(100);
             System.out.println(
                     "Topic: " + topic +
