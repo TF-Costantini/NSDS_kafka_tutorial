@@ -175,7 +175,7 @@ public class Consumers29 {
         }
 
         public void execute() {
-            // Consumer
+            // Consumer Alerts
             final Properties consumerProps = new Properties();
             consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, serverAddr);
             consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId);
@@ -188,6 +188,7 @@ public class Consumers29 {
             KafkaConsumer<String, String> consumer = new KafkaConsumer<>(consumerProps);
             consumer.subscribe(Arrays.asList(inputTopic));
 
+            // Consumer Reactions
             final Properties consumerProps2 = new Properties();
             consumerProps2.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, serverAddr);
             consumerProps2.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId + "-reactions");
@@ -200,7 +201,7 @@ public class Consumers29 {
             KafkaConsumer<String, Reaction> consumer2 = new KafkaConsumer<>(consumerProps2);
             consumer2.subscribe(Arrays.asList(reactionsTopic));
 
-            // Producer
+            // Producer Final Alert
             final Properties producerProps = new Properties();
             producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, serverAddr);
             producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
@@ -208,7 +209,7 @@ public class Consumers29 {
 
             final KafkaProducer<String, String> producer = new KafkaProducer<>(producerProps);
 
-            // Producer2
+            // Producer Reactions
             final Properties producerProps2 = new Properties();
             producerProps2.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, serverAddr);
             producerProps2.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
