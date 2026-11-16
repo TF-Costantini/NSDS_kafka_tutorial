@@ -13,18 +13,24 @@ import java.util.*;
 // Group members:
 
 // How many partitions can the topics "temperature" and "humidity" have?
+    // They can be [1, N) partitions as they are processed by Monitor by Key (roomID) this already ensures that all processors within the group receive coherent set of keys.
 
 // Is there any relation between the number of partitions in "temperature" and "humidity"?
+    // They must be equals otherwises they might get assigned to different consumers and we'd never be able to compare them in the IF block
 
-// Is it possible to have more than one instance of Monitor?
+// Is it possible to have more than one instance of Monitor? Yes
 // If so, what is the relation between their group id?
+    //They must be the same. Otherwise we'd double process and duplicate alerts.
 
 // How many partitions can the topic "alerts" have?
+    //[1, N) as they are also keyed by roomID.
 
-// Is it possible to have more than one instance of Reactor?
+// Is it possible to have more than one instance of Reactor? Yes
 // If so, what is the relation between their group id?
+    //Based on our implementation they must have the same groupId
 
 // How many partitions can the topic "processedAlerts" have?
+    //[1, N) as they are also keyed on roomId.
 
 // Which additional topics, if any, do you use? How many partitions can they have?
 
