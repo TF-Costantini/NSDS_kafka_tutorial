@@ -15,10 +15,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 
-// Group number:
-// Group members:
+// Group number: 29
+// Group members: Oleg Nedina 10905938, Tommaso Costantini 1098262, Nils Carlen 11240810
 
 // How many partitions can the topics "temperature" and "humidity" have?
     // They can be [1, N) partitions as they are processed by Monitor by Key (roomID) this already ensures that all processors within the group receive coherent set of keys.
@@ -41,8 +40,13 @@ import java.util.concurrent.ExecutionException;
     //[1, N) as they are also keyed on roomId.
 
 // Which additional topics, if any, do you use? How many partitions can they have?
+    // we used reactorTopic to log reactions. We built a state machine on reactions so that we ensure a sequential execution and by committing after each
+    // we guarantee that they are not rerun in case of failure.
+    // ALERT -> reaction1 -> reaction2 -> FORWARD ALERT all of if posted and polled from Kafka topics.
+    // Message content is forwarded with a custom Record message with a custom serializer and deserializer.
 
-public class ConsumersXX {
+
+public class Consumers29 {
     public static void main(String[] args) {
         String serverAddr = "localhost:9092";
         int stage = Integer.parseInt(args[0]);
