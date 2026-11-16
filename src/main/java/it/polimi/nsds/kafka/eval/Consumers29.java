@@ -23,11 +23,11 @@ import java.util.*;
     // They can be [1, N) partitions as they are processed by Monitor by Key (roomID) this already ensures that all processors within the group receive coherent set of keys.
 
 // Is there any relation between the number of partitions in "temperature" and "humidity"?
-    // They must be equals otherwises they might get assigned to different consumers and we'd never be able to compare them in the IF block
+    // They must be equals otherwise they might get assigned to different consumers and we'd never be able to compare them in the IF block
 
 // Is it possible to have more than one instance of Monitor? Yes
 // If so, what is the relation between their group id?
-    //They must be the same. Otherwise we'd double process and duplicate alerts.
+    //They must be the same. Otherwise, we'd double process and duplicate alerts.
 
 // How many partitions can the topic "alerts" have?
     //[1, N) as they are also keyed by roomID.
