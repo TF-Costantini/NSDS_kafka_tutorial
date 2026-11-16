@@ -91,10 +91,13 @@ public class ConsumersXX {
             consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
             consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, IntegerDeserializer.class.getName());
             consumerProps.put(ConsumerConfig.PARTITION_ASSIGNMENT_STRATEGY_CONFIG, RangeAssignor.class.getName());
-
-            // TODO: add properties if needed
+            consumerProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, String.valueOf(true));
+            consumerProps.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, 1000);
+            // Deliberate choice, if I register to an old topic I want to consume only the latest stuff not weeks old messages for this problem domain.
+            consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
 
             KafkaConsumer<String, Integer> consumer = new KafkaConsumer<>(consumerProps);
+            consumer.subscribe(Arrays.asList(temperaturesTopic, humiditiesTopic));
 
             // Producer
             final Properties producerProps = new Properties();
@@ -102,9 +105,11 @@ public class ConsumersXX {
             producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
             producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
 
-            // TODO: add properties if needed
+
+            final HashMap<String, Integer> humidities =
 
             final KafkaProducer<String, String> producer = new KafkaProducer<>(producerProps);
+
 
             // TODO: implement the processing logic
             while (true) {
@@ -155,6 +160,27 @@ public class ConsumersXX {
             while (true) {
                 // TODO: implement the processing logic
             }
+        }
+    }
+
+    private class Window {
+        private Deque<Integer> window = new ArrayDeque<>();
+
+        public void add(Integer newValue) {
+            int nullSafeValue = 0;
+            if (newValue != null) nullSafeValue = newValue;
+
+            if (window.size() >= 3) window.removeLast();
+            window.addFirst(newValue);
+        }
+
+        public int windowSum() {
+            int sum = 0;
+            for (Integer val: window) {
+                sum += val;
+            }
+
+            return sum/window.size();
         }
     }
 }
