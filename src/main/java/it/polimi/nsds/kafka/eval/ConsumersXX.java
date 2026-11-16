@@ -4,14 +4,18 @@ import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.IntegerDeserializer;
+import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
 
 // Group number:
 // Group members:
@@ -175,21 +179,19 @@ public class ConsumersXX {
             consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
             consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
             consumerProps.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, String.valueOf(false));
-            // Deliberate choice, if I register to an old topic I want to consume only the latest stuff not weeks old messages for this problem domain.
-            consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+            consumerProps.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
             KafkaConsumer<String, String> consumer = new KafkaConsumer<>(consumerProps);
             consumer.subscribe(Arrays.asList(inputTopic));
 
             final Properties consumerProps2 = new Properties();
             consumerProps2.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, serverAddr);
-            consumerProps2.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId);
+            consumerProps2.put(ConsumerConfig.GROUP_ID_CONFIG, consumerGroupId + "-reactions");
 
             consumerProps2.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
-            consumerProps2.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, );
+            consumerProps2.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ReactionDeserializer.class.getName());
             consumerProps2.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, String.valueOf(false));
-            // Deliberate choice, if I register to an old topic I want to consume only the latest stuff not weeks old messages for this problem domain.
-            consumerProps2.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+            consumerProps2.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
             KafkaConsumer<String, Reaction> consumer2 = new KafkaConsumer<>(consumerProps2);
             consumer2.subscribe(Arrays.asList(reactionsTopic));
@@ -206,41 +208,69 @@ public class ConsumersXX {
             final Properties producerProps2 = new Properties();
             producerProps2.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, serverAddr);
             producerProps2.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-            producerProps2.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+            producerProps2.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ReactionSerializer.class.getName());
 
             final KafkaProducer<String, Reaction> producer2 = new KafkaProducer<>(producerProps2);
 
             while (true) {
-                final ConsumerRecords<String, String> inputRecords = consumer.poll(Duration.of(5, ChronoUnit.MINUTES));
-                final ConsumerRecords<String, Reaction> reactionRecords = consumer2.poll(Duration.of(5, ChronoUnit.MINUTES));
-
+                final ConsumerRecords<String, String> inputRecords = consumer.poll(Duration.of(100, ChronoUnit.MILLIS));
                 for (final ConsumerRecord<String, String> thisRecord: inputRecords) {
                     String key = thisRecord.key();
                     String value = thisRecord.value();
 
-                    producer2.send(new ProducerRecord<>(reactionsTopic, key, new Reaction(reaction1, value)));
+                    send(producer2, new ProducerRecord<>(reactionsTopic, key, new Reaction(reaction1, value)));
+                    commit(consumer, thisRecord);
                 }
 
-
-
+                final ConsumerRecords<String, Reaction> reactionRecords = consumer2.poll(Duration.of(100, ChronoUnit.MILLIS));
                 for (final ConsumerRecord<String, Reaction> reactRecord: reactionRecords) {
                     String key = reactRecord.key();
                     Reaction value = reactRecord.value();
 
                     if (value.reaction.equals(reaction1)) {
                         reaction1(key, value.msg);
-                        producer2.send(new ProducerRecord<>(reactionsTopic, key, new Reaction(reaction2, value.msg)));
+                        send(producer2, new ProducerRecord<>(reactionsTopic, key, new Reaction(reaction2, value.msg)));
                     } else if (value.reaction.equals(reaction2)) {
                         reaction2(key, value.msg);
-                        producer.send(new ProducerRecord<>(outputTopic, key, value.msg));
+                        send(producer, new ProducerRecord<>(outputTopic, key, value.msg));
                     }
+                    commit(consumer2, reactRecord);
                 }
-
             }
         }
 
-        private record Reaction(String reaction, String msg) {}
+        private static <V> void send(KafkaProducer<String, V> producer, ProducerRecord<String, V> record) {
+            try {
+                producer.send(record).get();
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException(e);
+            }
+        }
 
+        private static void commit(KafkaConsumer<String, ?> consumer, ConsumerRecord<String, ?> record) {
+            consumer.commitSync(Collections.singletonMap(
+                    new TopicPartition(record.topic(), record.partition()),
+                    new OffsetAndMetadata(record.offset() + 1)));
+        }
+    }
+
+    private record Reaction(String reaction, String msg) {}
+
+    public static class ReactionSerializer implements Serializer<Reaction> {
+        @Override
+        public byte[] serialize(String topic, Reaction data) {
+            if (data == null) return null;
+            return (data.reaction() + ";" + data.msg()).getBytes(StandardCharsets.UTF_8);
+        }
+    }
+
+    public static class ReactionDeserializer implements Deserializer<Reaction> {
+        @Override
+        public Reaction deserialize(String topic, byte[] data) {
+            if (data == null) return null;
+            String[] parts = new String(data, StandardCharsets.UTF_8).split(";", 2);
+            return new Reaction(parts[0], parts[1]);
+        }
     }
 
 
